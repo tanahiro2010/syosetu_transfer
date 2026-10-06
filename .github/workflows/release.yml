@@ -30,12 +30,18 @@ jobs:
         run: |
           version=$(jq -r .version src-tauri/tauri.conf.json)
           tag="v${version}-build.${GITHUB_RUN_NUMBER}"
-          gh release create "$tag" \
-            --target "$GITHUB_SHA" \
-            --title "syosetu_transfer ${tag}" \
-            --notes "main の ${GITHUB_SHA::7} から自動ビルドしました。" \
-            --draft
-          id=$(gh api "repos/${GITHUB_REPOSITORY}/releases" --jq ".[] | select(.tag_name == \"${tag}\") | .id")
+          # 作成直後の下書きは一覧に出ないことがあるので、作成 API の返り値から ID を受け取る
+          id=$(gh api -X POST "repos/${GITHUB_REPOSITORY}/releases" \
+            -f tag_name="$tag" \
+            -f target_commitish="$GITHUB_SHA" \
+            -f name="syosetu_transfer ${tag}" \
+            -f body="main の ${GITHUB_SHA::7} から自動ビルドしました。" \
+            -F draft=true \
+            --jq .id)
+          if [ -z "$id" ]; then
+            echo "リリースIDを取得できませんでした" >&2
+            exit 1
+          fi
           echo "id=${id}" >> "$GITHUB_OUTPUT"
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
 
@@ -91,4 +97,7 @@ jobs:
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release edit "${{ needs.create-release.outputs.tag }}" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+        run: |
+          gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/${{ needs.create-release.outputs.release_id }}" \
+            -F draft=false \
+            -f make_latest=true
