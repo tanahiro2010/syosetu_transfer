@@ -1,7 +1,43 @@
-# Tauri + React + Typescript
+# Syosetu Transfer
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+カクヨムと小説家になろうの間で、掲載済みエピソードを取得して投稿作業を補助する Tauri アプリです。
 
-## Recommended IDE Setup
+## 開発
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+```bash
+bun run tauri dev
+```
+
+## ビルド
+
+```bash
+bun run tauri build
+```
+
+## 現在の対応範囲
+
+- カクヨム作品URLからエピソード一覧を取得（各話の間に設定した秒数だけ待つ）
+- 小説家になろうの ncode または作品URLからエピソード一覧を取得
+- 投稿先をアプリ内の「投稿ウィンドウ」で開き、タイトルと本文を自動入力
+  - 確認モード: 入力後に止まり、自分で保存して「次の話へ」
+  - 自動モード: 保存ボタンも押して全話を続けて投稿
+- 設定画面（投稿モード、間隔、初期値、ログイン）。設定はアプリのデータフォルダの `settings.json` に保存
+- 予備として、各話のタイトル・本文・全話JSONをコピー
+
+## 本文・ルビの扱い
+
+- 取得時に字下げ（行頭の全角スペース）と空行をそのまま残します。
+- ルビは `|親文字《ルビ》`、カクヨムの傍点は `《《文字》》` として取り込みます（`src-tauri/src/fetch.rs`）。
+- 投稿時に投稿先の記法へ変換します（`src/notation.ts`）。
+  - なろう宛: 傍点は `|文章《・・》`（文字数分の「・」、10文字ずつに分割）。地の文の「漢字（かな）」は自動ルビにならないよう `漢字|（かな）` にします。
+  - カクヨム宛: `|文章《・・》` 形式の傍点ルビは `《《文章》》` に戻します。
+  - 設定で「ルビと傍点を外す」も選べます。
+
+## 自動入力の仕組み
+
+Selenium / ChromeDriver は使いません。Tauri の WebView（Windows は WebView2、macOS は WKWebView、Linux は WebKitGTK）で
+投稿サイトを開き、Rust から `eval_with_callback` で JS を実行して入力します（`src-tauri/src/poster.rs`）。
+外部サイトにはアプリの IPC を公開していません。
+
+ログインは投稿ウィンドウで本人が行います。パスワードは保存せず、Cookie だけがアプリのデータフォルダに残ります。
+サイトの HTML が変わるとセレクタ（`form_spec`）の修正が必要になります。
