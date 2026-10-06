@@ -3,6 +3,12 @@ name: Build and release
 on:
   push:
     branches: [main]
+    # アプリの中身に関係しない変更だけの push ではビルドしない
+    paths-ignore:
+      - "**.md"
+      - "origin_proj/**"
+      - ".vscode/**"
+      - "LICENSE"
   workflow_dispatch:
 
 # 連続で push されたときは順番に処理する（途中で止めると下書きのリリースが残るため）
@@ -87,6 +93,10 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Cargo.toml の lto = true / codegen-units = 1 は、キャッシュがあってもリンク時に
+          # 全依存を最適化し直すため遅い。CI では thin LTO にしてビルド時間を短くする
+          CARGO_PROFILE_RELEASE_LTO: thin
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
         with:
           releaseId: ${{ needs.create-release.outputs.release_id }}
           tauriScript: bun run tauri
